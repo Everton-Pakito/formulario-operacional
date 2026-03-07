@@ -16,7 +16,7 @@ const identificationFields = [
   { id: 'instrutor', label: 'Instrutor', type: 'text', span: 4, placeholder: 'Nome do instrutor' },
   { id: 'numeroViagem', label: 'Número da viagem', type: 'text', span: 3, placeholder: 'Ex.: 1 viagem' },
   { id: 'empresa', label: 'Transportadora', type: 'text', span: 5, placeholder: 'Ex.: SUZANO S/A' },
-  { id: 'tipoMotorista', label: 'Classificação', type: 'select', span: 4, options: ['Proprio', 'Terceiro', 'Agregado', 'Outro'] },
+  { id: 'tipoMotorista', label: 'Classificação', type: 'select', span: 4, options: ['Prando', 'Terceiro', 'Agregado', 'Outro'] },
   { id: 'comentario', label: 'Comentário geral da identificação', type: 'textarea', span: 12, placeholder: 'Ex.: Teste prático - motorista Prando.' }
 ];
 
