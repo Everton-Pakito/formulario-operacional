@@ -1,0 +1,15 @@
+{
+  "name": "Teste Prático de Direção - Prando",
+  "short_name": "Prando Teste",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f0f10",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "logo-prando.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
