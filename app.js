@@ -1,770 +1,374 @@
+const STORAGE_KEY = 'prando_avaliacao_rascunho_v4';
+const FORM_ARCHIVE_KEY = 'prando_avaliacao_historico_v1';
+const DB_NAME = 'prando_avaliacao_db';
+const DB_STORE = 'drafts';
+const DRAFT_ID = 'current';
 
-const perguntas = {
-  direcao: [
-    'Faz uso correto do cinto de segurança?',
-    'Mantém atenção em cruzamentos e acessos?',
-    'Conduz o veículo de forma consciente e segura?',
-    'Mantém distância segura do veículo à frente?',
-    'Realiza ultrapassagens somente em local permitido?',
-    'Evita formação de comboio?',
-    'Adequa a velocidade em curvas acentuadas?',
-    'Reduz velocidade em chuva e baixa visibilidade?',
-    'Respeita velocidade em trechos de serra?',
-    'Utiliza corretamente as setas de direção?',
-    'Confere e utiliza faróis de serviço corretamente?'
-  ],
-  procedimentos: [
-    'Confere documentação do cavalo e composições?',
-    'Utiliza marcha adequada durante a condução?',
-    'Efetua trocas de marcha sem trancos ou ruídos?',
-    'Usa corretamente freios e embreagem?',
-    'Executa procedimento correto em declives e lombadas?',
-    'Executa amarração e desamarração corretamente?',
-    'Segue procedimento de carregamento e descarregamento?',
-    'Utiliza os EPIs obrigatórios?',
-    'Preenche checklist corretamente?',
-    'Confere rotograma antes da viagem?',
-    'Participa do DDS quando aplicável?',
-    'Mantém limpeza e organização do equipamento?',
-    'Respeita pontos de parada autorizados?',
-    'Executa corretamente subida e descida da cabine?',
-    'Utiliza corretamente o rádio/comunicação?',
-    'Usa corretamente sistemas de monitoramento?'
-  ]
-};
+const questions = [
+'Fez uso do cinto de segurança?',
+'Apresenta alguma alteração em condições ambientais adversas como chuva, sol, neblina?',
+'Teve atenção na condução em cruzamentos sinalizados ou sem sinalização?',
+'Conduz o veículo de forma consciente e segura quando está em rodovia?',
+'Conduz o veículo de forma prevenida de acordo com as adversidades do trânsito?',
+'Mantém a distância segura entre veículos?',
+'Executou somente ultrapassagem permitida?',
+'Participou da formação de comboio?',
+'Realiza curvas acentuadas em velocidade compatível?',
+'Respeita uma velocidade de segurança na chuva ou em condições precárias de tráfego?',
+'Respeita uma velocidade de segurança em trechos de serra?',
+'Faz a utilização correta das setas?',
+'Confere se os faróis de serviço estão ligados?',
+'Confere a documentação do cavalo e composições?',
+'Utiliza marcha adequada para colocar o veículo em movimento?',
+'As trocas de marcha ocorrem sem trancos e ruído?',
+'Faz uso correto dos freios e embreagem?',
+'Passa de forma adequada por declives, lombadas e semáforos?',
+'Executa procedimentos corretos durante a amarração e desamarração da carga?',
+'Executa procedimentos corretos durante o carregamento e descarregamento?',
+'Fez uso dos equipamentos de proteção individual (EPI\'s)?',
+'Preencheu corretamente o checklist?',
+'Conferiu as informações do rotograma?',
+'Participou de DDS?',
+'Cuida da aparência pessoal?',
+'Realiza a limpeza do equipamento?',
+'Respeitou os pontos de parada autorizadas?',
+'Executa corretamente o procedimento de subir e descer da cabine?',
+'Faz utilização correta do rádio?',
+'Utiliza corretamente os sistemas de monitoramento da direção segura?'
+];
 
-const DB_NAME = 'prando-avaliacao-db';
-const DB_VERSION = 1;
-const DRAFT_STORE = 'drafts';
-const HISTORY_STORE = 'history';
-const CURRENT_DRAFT_ID = 'current';
-const LS_META_KEY = 'prando_avaliacao_meta_v3';
-const AUTO_SAVE_DELAY = 500;
+let dbPromise;
 
-const els = {
-  form: document.getElementById('avaliacaoForm'),
-  direcaoList: document.getElementById('direcaoList'),
-  procedimentosList: document.getElementById('procedimentosList'),
-  statusPersistencia: document.getElementById('statusPersistencia'),
-  statusUltimoSave: document.getElementById('statusUltimoSave'),
-  historicoList: document.getElementById('historicoList'),
-  printArea: document.getElementById('printArea')
-};
-
-let dbPromise = null;
-let autoSaveTimer = null;
-let signaturePads = {};
-let photoCache = {};
-let booting = true;
-
-function rotulo(v) {
-  if (v === 'conforme') return 'Conforme';
-  if (v === 'nao_conforme') return 'Não conforme';
-  if (v === 'nao_aplicavel') return 'Não aplicável';
-  return 'Não respondido';
-}
-
-function openDB() {
+function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = event => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(DRAFT_STORE)) {
-        db.createObjectStore(DRAFT_STORE, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(HISTORY_STORE)) {
-        db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
-      }
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(DB_STORE, { keyPath: 'id' });
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
   return dbPromise;
 }
 
-async function idbPut(storeName, value) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).put(value);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function idbGet(storeName, key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const req = tx.objectStore(storeName).get(key);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbDelete(storeName, key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function idbGetAll(storeName) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const req = tx.objectStore(storeName).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function criarQuestoes() {
-  for (const [grupo, itens] of Object.entries(perguntas)) {
-    const target = grupo === 'direcao' ? els.direcaoList : els.procedimentosList;
-    target.innerHTML = '';
-
-    itens.forEach((texto, idx) => {
-      const id = `${grupo}_${idx}`;
-      const card = document.createElement('div');
-      card.className = 'question-card';
-      card.innerHTML = `
-        <div class="question-title">${idx + 1}. ${texto}</div>
-        <div class="choices">
-          ${['conforme','nao_conforme','nao_aplicavel'].map(v => `
-            <label class="choice">
-              <input type="radio" name="${id}" value="${v}" />
-              <span>${rotulo(v)}</span>
-            </label>
-          `).join('')}
-        </div>
-
-        <div class="meta-grid">
-          <label>
-            <span>Justificativa</span>
-            <textarea data-justificativa="${id}" rows="2" placeholder="Descreva a observação quando necessário"></textarea>
-            <small class="help">Obrigatória quando marcar Não conforme.</small>
-          </label>
-
-          <label>
-            <span>Fotos</span>
-            <input type="file" data-fotos="${id}" accept="image/*" multiple />
-            <small class="help">As imagens são salvas localmente no dispositivo.</small>
-            <div class="photo-preview-list" data-preview="${id}"></div>
-          </label>
-        </div>
-      `;
-      target.appendChild(card);
+async function idbSet(value) {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put({ id: DRAFT_ID, payload: value, updatedAt: new Date().toISOString() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
     });
-  }
+  } catch (e) { console.warn('IndexedDB indisponível', e); }
 }
 
-function setupSignaturePad(canvasId) {
+async function idbGet() {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).get(DRAFT_ID);
+      req.onsuccess = () => resolve(req.result ? req.result.payload : null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { console.warn('IndexedDB indisponível', e); return null; }
+}
+
+async function idbDelete() {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).delete(DRAFT_ID);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn('IndexedDB indisponível', e); }
+}
+
+function buildQuestions() {
+  const container = document.getElementById('questionsContainer');
+  container.innerHTML = '';
+  questions.forEach((text, index) => {
+    const id = index + 1;
+    const card = document.createElement('div');
+    card.className = 'question-card';
+    card.dataset.questionId = id;
+    card.innerHTML = `
+      <h3>${id}. ${text}</h3>
+      <div class="options">
+        <label><input type="radio" name="q_${id}" value="conforme"> Conforme</label>
+        <label><input type="radio" name="q_${id}" value="nao_conforme"> Não Conforme</label>
+        <label><input type="radio" name="q_${id}" value="nao_aplicavel"> Não Aplicável</label>
+      </div>
+      <div class="question-meta">
+        <label>Justificativa
+          <textarea rows="3" id="justificativa_${id}" placeholder="Descreva a observação, orientação ou não conformidade"></textarea>
+        </label>
+        <label>Fotos
+          <input type="file" id="foto_${id}" accept="image/*" multiple />
+          <div class="image-preview" id="preview_${id}"></div>
+        </label>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+function getFieldIds() {
+  return ['data','unidade','codigo','empresa','motorista','instrutor','placa','viagem','kmInicio','kmFinal','observacoesGerais'];
+}
+
+function getSignatureData(canvasId) {
   const canvas = document.getElementById(canvasId);
-  const ctx = canvas.getContext('2d');
+  return isCanvasBlank(canvas) ? '' : canvas.toDataURL('image/png');
+}
 
-  function resizeCanvas(keepImage = true) {
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const rect = canvas.getBoundingClientRect();
-    const snapshot = keepImage ? canvas.toDataURL('image/png') : null;
-    canvas.width = Math.round(rect.width * ratio);
-    canvas.height = Math.round(rect.height * ratio);
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#111';
-    if (snapshot && snapshot !== 'data:,') {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-      img.src = snapshot;
-    } else {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, rect.width, rect.height);
-    }
-  }
+function collectFormData() {
+  const metadata = {};
+  getFieldIds().forEach(id => metadata[id] = document.getElementById(id).value || '');
 
-  resizeCanvas(false);
-  window.addEventListener('resize', () => resizeCanvas(true));
+  const respostas = questions.map((q, idx) => {
+    const id = idx + 1;
+    const checked = document.querySelector(`input[name="q_${id}"]:checked`);
+    const previewImgs = [...document.querySelectorAll(`#preview_${id} img`)];
+    return {
+      id,
+      pergunta: q,
+      resposta: checked ? checked.value : '',
+      justificativa: document.getElementById(`justificativa_${id}`).value || '',
+      fotos: previewImgs.map(img => img.src)
+    };
+  });
 
-  let drawing = false;
-  let moved = false;
-
-  const getPos = e => {
-    const rect = canvas.getBoundingClientRect();
-    const point = e.touches ? e.touches[0] : e;
-    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
-  };
-
-  const start = e => {
-    drawing = true;
-    moved = false;
-    const p = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    e.preventDefault();
-  };
-
-  const move = e => {
-    if (!drawing) return;
-    moved = true;
-    const p = getPos(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    e.preventDefault();
-  };
-
-  const end = () => {
-    if (!drawing) return;
-    drawing = false;
-    if (moved) triggerAutoSave();
-  };
-
-  ['mousedown', 'touchstart'].forEach(ev => canvas.addEventListener(ev, start, { passive: false }));
-  ['mousemove', 'touchmove'].forEach(ev => canvas.addEventListener(ev, move, { passive: false }));
-  ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(ev => canvas.addEventListener(ev, end));
-
-  signaturePads[canvasId] = {
-    clear() {
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, rect.width, rect.height);
-    },
-    toDataURL() {
-      return canvas.toDataURL('image/png');
-    },
-    fromDataURL(dataUrl) {
-      this.clear();
-      if (!dataUrl || dataUrl === 'data:,') return;
-      const img = new Image();
-      img.onload = () => {
-        const rect = canvas.getBoundingClientRect();
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
-      };
-      img.src = dataUrl;
-    }
+  return {
+    metadata,
+    respostas,
+    assinaturaMotorista: getSignatureData('assinaturaMotorista'),
+    assinaturaInstrutor: getSignatureData('assinaturaInstrutor'),
+    updatedAt: new Date().toISOString()
   };
 }
 
-function bindEvents() {
-  document.addEventListener('input', event => {
-    if (event.target.matches('input[type="text"], input[type="date"], input[type="number"], textarea')) {
-      calcular();
-      triggerAutoSave();
-    }
-  });
-
-  document.addEventListener('change', async event => {
-    const target = event.target;
-
-    if (target.matches('input[type="radio"]')) {
-      calcular();
-      triggerAutoSave();
-      return;
-    }
-
-    if (target.matches('input[type="file"][data-fotos]')) {
-      const id = target.dataset.fotos;
-      const files = Array.from(target.files || []);
-      const existing = photoCache[id] || [];
-      const converted = await Promise.all(files.map(fileToDataUrl));
-      photoCache[id] = existing.concat(converted.map((dataUrl, index) => ({
-        id: cryptoRandom(),
-        name: files[index].name,
-        dataUrl
-      })));
-      renderPhotoPreview(id);
-      target.value = '';
-      triggerAutoSave();
-      return;
-    }
-  });
-
-  document.querySelectorAll('[data-clear]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.clear;
-      signaturePads[id].clear();
-      triggerAutoSave();
+function applyFormData(data) {
+  if (!data) return;
+  if (data.metadata) {
+    getFieldIds().forEach(id => {
+      document.getElementById(id).value = data.metadata[id] || '';
     });
-  });
-
-  document.addEventListener('click', event => {
-    const btn = event.target.closest('[data-remove-photo]');
-    if (!btn) return;
-    const qid = btn.dataset.removePhoto;
-    const pid = btn.dataset.photoId;
-    photoCache[qid] = (photoCache[qid] || []).filter(item => item.id !== pid);
-    renderPhotoPreview(qid);
-    triggerAutoSave();
-  });
-
-  document.getElementById('btnSalvar').addEventListener('click', async () => {
-    await saveDraft(true);
-    await salvarNoHistorico();
-    await renderHistorico();
-    alert('Avaliação salva localmente com sucesso.');
-  });
-
-  document.getElementById('btnNovoFormulario').addEventListener('click', async () => {
-    const ok = confirm('Deseja iniciar um novo formulário? O rascunho atual será limpo do formulário. Antes disso, salve se quiser manter uma cópia no histórico.');
-    if (!ok) return;
-    await clearCurrentDraft();
-    limparFormulario();
-    calcular();
-    updateSaveStatus('Novo formulário iniciado.');
-  });
-
-  document.getElementById('btnPdf').addEventListener('click', async () => {
-    await saveDraft(true);
-    await gerarRelatorioImpressao();
-    window.print();
-  });
+  }
+  if (Array.isArray(data.respostas)) {
+    data.respostas.forEach(item => {
+      if (item.resposta) {
+        const radio = document.querySelector(`input[name="q_${item.id}"][value="${item.resposta}"]`);
+        if (radio) radio.checked = true;
+      }
+      const textarea = document.getElementById(`justificativa_${item.id}`);
+      if (textarea) textarea.value = item.justificativa || '';
+      const preview = document.getElementById(`preview_${item.id}`);
+      if (preview) {
+        preview.innerHTML = '';
+        (item.fotos || []).forEach(src => addPreviewImage(preview, src));
+      }
+    });
+  }
+  if (data.assinaturaMotorista) drawImageOnCanvas('assinaturaMotorista', data.assinaturaMotorista);
+  if (data.assinaturaInstrutor) drawImageOnCanvas('assinaturaInstrutor', data.assinaturaInstrutor);
+  updateSummary();
 }
 
-function cryptoRandom() {
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+function addPreviewImage(previewElement, src) {
+  const img = document.createElement('img');
+  img.src = src;
+  previewElement.appendChild(img);
 }
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
 
-function formValue(name) {
-  return els.form.querySelector(`[name="${name}"]`)?.value || '';
-}
-
-function getAnsweredQuestionIds() {
-  const ids = [];
-  for (const [grupo, itens] of Object.entries(perguntas)) {
-    itens.forEach((_, idx) => ids.push(`${grupo}_${idx}`));
+async function handleFiles(input) {
+  const qid = input.id.split('_')[1];
+  const preview = document.getElementById(`preview_${qid}`);
+  const files = [...input.files];
+  for (const file of files) {
+    const dataUrl = await fileToDataUrl(file);
+    addPreviewImage(preview, dataUrl);
   }
-  return ids;
+  input.value = '';
+  persistDraft();
 }
 
-function collectDraft() {
-  const formData = Object.fromEntries(new FormData(els.form).entries());
-  const respostas = {};
-  for (const id of getAnsweredQuestionIds()) {
-    respostas[id] = {
-      resposta: document.querySelector(`input[name="${id}"]:checked`)?.value || '',
-      justificativa: document.querySelector(`[data-justificativa="${id}"]`)?.value || '',
-      fotos: photoCache[id] || []
-    };
-  }
-
-  return {
-    id: CURRENT_DRAFT_ID,
-    updatedAt: new Date().toISOString(),
-    formData,
-    respostas,
-    assinaturas: {
-      motorista: signaturePads.assinaturaMotorista.toDataURL(),
-      instrutor: signaturePads.assinaturaInstrutor.toDataURL()
-    },
-    metricas: getMetricas()
-  };
-}
-
-function getMetricas() {
-  let possiveis = 0;
-  let realizados = 0;
-  let nc = 0;
-  let na = 0;
-
-  for (const [grupo, itens] of Object.entries(perguntas)) {
-    itens.forEach((_, idx) => {
-      const answer = document.querySelector(`input[name="${grupo}_${idx}"]:checked`)?.value || '';
-      if (!answer) return;
-      if (answer === 'nao_aplicavel') {
-        na += 1;
-        return;
-      }
-      possiveis += 1;
-      if (answer === 'conforme') realizados += 1;
-      if (answer === 'nao_conforme') nc += 1;
-    });
-  }
-
-  const aproveitamento = possiveis ? Math.round((realizados / possiveis) * 100) : 0;
-  const status = !possiveis ? 'Em avaliação' : (aproveitamento >= 80 && nc <= 3 ? 'Aprovado' : 'Reprovado');
-
-  return { possiveis, realizados, nc, na, aproveitamento, status };
-}
-
-function calcular() {
-  const m = getMetricas();
-  document.getElementById('pontosPossiveis').textContent = m.possiveis;
-  document.getElementById('pontosRealizados').textContent = m.realizados;
-  document.getElementById('naoConformidades').textContent = m.nc;
-  document.getElementById('naoAplicaveis').textContent = m.na;
-  document.getElementById('aproveitamento').textContent = `${m.aproveitamento}%`;
-
-  const status = document.getElementById('statusFinal');
-  status.textContent = m.status;
-  status.className = m.status === 'Aprovado' ? 'status-ok' : (m.status === 'Reprovado' ? 'status-bad' : '');
-}
-
-function renderPhotoPreview(questionId) {
-  const wrap = document.querySelector(`[data-preview="${questionId}"]`);
-  if (!wrap) return;
-  const fotos = photoCache[questionId] || [];
-  wrap.innerHTML = fotos.map(item => `
-    <div class="photo-chip">
-      <img src="${item.dataUrl}" alt="Foto do item" />
-      <button type="button" class="ghost" data-remove-photo="${questionId}" data-photo-id="${item.id}">Excluir</button>
-    </div>
-  `).join('');
-}
-
-function applyDraft(draft) {
-  limparFormulario(false);
-
-  if (draft?.formData) {
-    Object.entries(draft.formData).forEach(([name, value]) => {
-      const field = els.form.querySelector(`[name="${name}"]`);
-      if (field && field.type !== 'file') field.value = value;
-    });
-  }
-
-  photoCache = {};
-  for (const id of getAnsweredQuestionIds()) {
-    const info = draft?.respostas?.[id];
-    if (info?.resposta) {
-      const radio = document.querySelector(`input[name="${id}"][value="${info.resposta}"]`);
-      if (radio) radio.checked = true;
+function updateSummary() {
+  let possiveis = 0, realizados = 0, nc = 0, na = 0;
+  questions.forEach((_, idx) => {
+    const value = document.querySelector(`input[name="q_${idx + 1}"]:checked`)?.value || '';
+    if (!value) return;
+    if (value === 'nao_aplicavel') {
+      na++;
+      return;
     }
-    const just = document.querySelector(`[data-justificativa="${id}"]`);
-    if (just) just.value = info?.justificativa || '';
-
-    photoCache[id] = Array.isArray(info?.fotos) ? info.fotos : [];
-    renderPhotoPreview(id);
-  }
-
-  signaturePads.assinaturaMotorista.fromDataURL(draft?.assinaturas?.motorista || '');
-  signaturePads.assinaturaInstrutor.fromDataURL(draft?.assinaturas?.instrutor || '');
-  calcular();
+    possiveis++;
+    if (value === 'conforme') realizados++;
+    if (value === 'nao_conforme') nc++;
+  });
+  const aproveitamento = possiveis ? Math.round((realizados / possiveis) * 100) : 0;
+  const status = possiveis === 0 ? 'Pendente' : (aproveitamento >= 80 ? 'Aprovado' : 'Reprovado');
+  document.getElementById('pontosPossiveis').textContent = possiveis;
+  document.getElementById('pontosRealizados').textContent = realizados;
+  document.getElementById('naoConformidades').textContent = nc;
+  document.getElementById('naoAplicaveis').textContent = na;
+  document.getElementById('aproveitamento').textContent = `${aproveitamento}%`;
+  const statusEl = document.getElementById('statusFinal');
+  statusEl.textContent = status;
+  statusEl.className = status === 'Aprovado' ? 'badge-ok' : (status === 'Reprovado' ? 'badge-nc' : 'badge-na');
 }
 
-function limparFormulario(clearStatus = true) {
-  els.form.reset();
-  document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
-  document.querySelectorAll('[data-justificativa]').forEach(t => t.value = '');
-  photoCache = {};
-  document.querySelectorAll('[data-preview]').forEach(div => div.innerHTML = '');
-  if (signaturePads.assinaturaMotorista) signaturePads.assinaturaMotorista.clear();
-  if (signaturePads.assinaturaInstrutor) signaturePads.assinaturaInstrutor.clear();
-  if (clearStatus) {
-    localStorage.removeItem(LS_META_KEY);
-  }
+async function persistDraft() {
+  const data = collectFormData();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  await idbSet(data);
 }
 
-async function saveDraft(showCleanMessage = false) {
-  const draft = collectDraft();
-  await idbPut(DRAFT_STORE, draft);
-
-  const meta = {
-    updatedAt: draft.updatedAt,
-    motorista: draft.formData.motorista || '',
-    placa: draft.formData.placa || '',
-    status: draft.metricas.status
-  };
-  localStorage.setItem(LS_META_KEY, JSON.stringify(meta));
-
-  const when = new Date(draft.updatedAt).toLocaleString('pt-BR');
-  updateSaveStatus(showCleanMessage ? `Salvo em ${when}` : `Rascunho salvo automaticamente em ${when}`);
+function archiveCurrentForm(data) {
+  const existing = JSON.parse(localStorage.getItem(FORM_ARCHIVE_KEY) || '[]');
+  existing.unshift({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    savedAt: new Date().toISOString(),
+    motorista: data.metadata?.motorista || '',
+    placa: data.metadata?.placa || '',
+    data: data.metadata?.data || '',
+    payload: data
+  });
+  localStorage.setItem(FORM_ARCHIVE_KEY, JSON.stringify(existing.slice(0, 20)));
 }
 
-async function salvarNoHistorico() {
-  const draft = collectDraft();
-  const id = `${Date.now()}`;
-  const item = {
-    ...draft,
-    id,
-    title: `${draft.formData.motorista || 'Sem motorista'} - ${draft.formData.placa || 'Sem placa'}`,
-    savedAt: new Date().toISOString()
-  };
-  await idbPut(HISTORY_STORE, item);
+async function loadDraft() {
+  const fromIdb = await idbGet();
+  const fromLs = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  applyFormData(fromIdb || fromLs);
 }
 
-async function clearCurrentDraft() {
-  await idbDelete(DRAFT_STORE, CURRENT_DRAFT_ID);
-  localStorage.removeItem(LS_META_KEY);
+async function newForm() {
+  if (!confirm('Deseja iniciar um novo formulário? O rascunho atual será arquivado e o formulário será limpo.')) return;
+  const current = collectFormData();
+  archiveCurrentForm(current);
+  localStorage.removeItem(STORAGE_KEY);
+  await idbDelete();
+  location.reload();
 }
 
-function updateSaveStatus(message) {
-  els.statusPersistencia.textContent = 'Rascunho protegido';
-  els.statusUltimoSave.textContent = message;
-}
-
-function triggerAutoSave() {
-  if (booting) return;
-  clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => {
-    saveDraft(false).catch(() => {
-      els.statusPersistencia.textContent = 'Falha ao salvar';
-      els.statusUltimoSave.textContent = 'Tente salvar manualmente.';
-    });
-  }, AUTO_SAVE_DELAY);
-}
-
-async function restoreOnLoad() {
-  const localMeta = JSON.parse(localStorage.getItem(LS_META_KEY) || 'null');
-  const draft = await idbGet(DRAFT_STORE, CURRENT_DRAFT_ID);
-  if (draft) {
-    applyDraft(draft);
-    const when = new Date(draft.updatedAt).toLocaleString('pt-BR');
-    updateSaveStatus(`Rascunho restaurado. Último salvamento: ${when}`);
-  } else if (localMeta) {
-    updateSaveStatus(`Meta local encontrada em ${new Date(localMeta.updatedAt).toLocaleString('pt-BR')}, mas sem rascunho completo no banco local.`);
-  } else {
-    els.statusPersistencia.textContent = 'Sem rascunho salvo';
-    els.statusUltimoSave.textContent = 'Preencha o formulário. O app salva automaticamente.';
-  }
-}
-
-async function renderHistorico() {
-  const itens = await idbGetAll(HISTORY_STORE);
-  itens.sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
-  if (!itens.length) {
-    els.historicoList.innerHTML = `<p class="muted">Nenhuma cópia salva no histórico ainda.</p>`;
-    return;
-  }
-
-  els.historicoList.innerHTML = itens.slice(0, 10).map(item => `
-    <div class="history-card">
-      <div>
-        <p><strong>${escapeHtml(item.title || 'Avaliação salva')}</strong></p>
-        <p class="muted">${new Date(item.savedAt).toLocaleString('pt-BR')} • ${escapeHtml(item.metricas?.status || 'Sem status')}</p>
-      </div>
-      <div class="top-actions">
-        <button type="button" class="ghost" data-load-history="${item.id}">Carregar</button>
-        <button type="button" class="ghost danger" data-delete-history="${item.id}">Excluir</button>
-      </div>
-    </div>
-  `).join('');
-
-  els.historicoList.querySelectorAll('[data-load-history]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const item = await idbGet(HISTORY_STORE, btn.dataset.loadHistory);
-      if (!item) return;
-      applyDraft(item);
-      await saveDraft(true);
-      alert('Avaliação carregada no formulário atual.');
+function setupAutosave() {
+  document.querySelectorAll('input, textarea, select').forEach(el => {
+    const eventName = el.type === 'radio' || el.type === 'file' ? 'change' : 'input';
+    el.addEventListener(eventName, () => {
+      updateSummary();
+      persistDraft();
     });
   });
+  questions.forEach((_, idx) => {
+    document.getElementById(`foto_${idx + 1}`).addEventListener('change', e => handleFiles(e.target));
+  });
+}
 
-  els.historicoList.querySelectorAll('[data-delete-history]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const ok = confirm('Excluir esta cópia do histórico?');
-      if (!ok) return;
-      await idbDelete(HISTORY_STORE, btn.dataset.deleteHistory);
-      await renderHistorico();
+function setupSignatures() {
+  ['assinaturaMotorista', 'assinaturaInstrutor'].forEach(setupSignaturePad);
+  document.querySelectorAll('[data-clear-signature]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.clearSignature;
+      const canvas = document.getElementById(id);
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      persistDraft();
     });
   });
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+function setupSignaturePad(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#111827';
+
+  const resizeCanvas = () => {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const rect = canvas.getBoundingClientRect();
+    const snapshot = isCanvasBlank(canvas) ? null : canvas.toDataURL('image/png');
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#111827';
+    if (snapshot) drawImageOnCanvas(canvasId, snapshot);
+  };
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  let drawing = false;
+  const point = evt => {
+    const rect = canvas.getBoundingClientRect();
+    const source = evt.touches ? evt.touches[0] : evt;
+    return { x: source.clientX - rect.left, y: source.clientY - rect.top };
+  };
+  const start = evt => { drawing = true; const p = point(evt); ctx.beginPath(); ctx.moveTo(p.x, p.y); evt.preventDefault(); };
+  const move = evt => { if (!drawing) return; const p = point(evt); ctx.lineTo(p.x, p.y); ctx.stroke(); evt.preventDefault(); };
+  const end = () => { if (drawing) persistDraft(); drawing = false; };
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('touchend', end);
 }
 
-function buildRows(grupo) {
-  return perguntas[grupo].map((texto, idx) => {
-    const id = `${grupo}_${idx}`;
-    const resposta = document.querySelector(`input[name="${id}"]:checked`)?.value || '';
-    const justificativa = document.querySelector(`[data-justificativa="${id}"]`)?.value || '';
-    return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(texto)}</td>
-        <td>${escapeHtml(rotulo(resposta))}</td>
-        <td>${escapeHtml(justificativa || '-')}</td>
-      </tr>
-    `;
-  }).join('');
+function drawImageOnCanvas(canvasId, src) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ratio = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const w = img.width * ratio;
+    const h = img.height * ratio;
+    ctx.drawImage(img, 0, 0, w, h);
+  };
+  img.src = src;
 }
 
-function collectPrintablePhotos() {
-  const entries = [];
-  for (const [grupo, itens] of Object.entries(perguntas)) {
-    itens.forEach((texto, idx) => {
-      const id = `${grupo}_${idx}`;
-      const fotos = photoCache[id] || [];
-      fotos.forEach((foto, fidx) => {
-        entries.push({
-          legenda: `${texto} (${fidx + 1})`,
-          dataUrl: foto.dataUrl
-        });
-      });
-    });
-  }
-  return entries;
+function isCanvasBlank(canvas) {
+  const ctx = canvas.getContext('2d');
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  return !pixels.some(channel => channel !== 0);
 }
 
-async function gerarRelatorioImpressao() {
-  const draft = collectDraft();
-  const info = draft.formData;
-  const m = draft.metricas;
-  const fotos = collectPrintablePhotos();
-
-  const page1 = `
-    <div class="print-page">
-      <div class="print-header">
-        <img src="Logo-prando-dourada.png" alt="Prando" />
-        <div class="print-title">
-          <h1>Avaliação Prática de Direção</h1>
-          <p>Logística Florestal • Relatório operacional em formato A4</p>
-        </div>
-      </div>
-
-      <div class="print-grid">
-        ${printField('Unidade', info.unidade)}
-        ${printField('Data', info.data)}
-        ${printField('KM Início', info.kmInicio)}
-        ${printField('KM Final', info.kmFinal)}
-        ${printField('Motorista', info.motorista)}
-        ${printField('Instrutor', info.instrutor)}
-        ${printField('Placa', info.placa)}
-        ${printField('Nº da Viagem', info.viagem)}
-        ${printField('Empresa', info.empresa, true)}
-        ${printField('Observações Gerais', info.observacoesGerais, true)}
-      </div>
-
-      <div class="print-section">
-        <h2>Resumo</h2>
-        <div class="print-summary">
-          <div class="print-box"><span>Pontos possíveis</span><strong>${m.possiveis}</strong></div>
-          <div class="print-box"><span>Pontos realizados</span><strong>${m.realizados}</strong></div>
-          <div class="print-box"><span>Não conformidades</span><strong>${m.nc}</strong></div>
-          <div class="print-box"><span>Aproveitamento</span><strong>${m.aproveitamento}%</strong></div>
-        </div>
-      </div>
-
-      <div class="print-section">
-        <h2>Direção Preventiva</h2>
-        <table class="print-table">
-          <thead>
-            <tr>
-              <th style="width:8%">#</th>
-              <th style="width:42%">Item</th>
-              <th style="width:18%">Resposta</th>
-              <th style="width:32%">Justificativa</th>
-            </tr>
-          </thead>
-          <tbody>${buildRows('direcao')}</tbody>
-        </table>
-      </div>
-
-      <div class="print-footer">Prando - Operação Florestal Suzano</div>
-    </div>
-  `;
-
-  const page2Photos = fotos.length ? `
-    <div class="print-section">
-      <h2>Registro fotográfico</h2>
-      <div class="print-photos">
-        ${fotos.map(f => `
-          <figure>
-            <img src="${f.dataUrl}" alt="Foto anexada" />
-            <figcaption>${escapeHtml(f.legenda)}</figcaption>
-          </figure>
-        `).join('')}
-      </div>
-    </div>
-  ` : `
-    <div class="print-section">
-      <h2>Registro fotográfico</h2>
-      <p>Nenhuma foto anexada nesta avaliação.</p>
-    </div>
-  `;
-
-  const page2 = `
-    <div class="print-page">
-      <div class="print-header">
-        <img src="Logo-prando-dourada.png" alt="Prando" />
-        <div class="print-title">
-          <h1>Avaliação Prática de Direção</h1>
-          <p>Continuação do relatório • Procedimentos, fotos e assinaturas</p>
-        </div>
-      </div>
-
-      <div class="print-section">
-        <h2>Procedimentos e Normas Gerais de Ação</h2>
-        <table class="print-table">
-          <thead>
-            <tr>
-              <th style="width:8%">#</th>
-              <th style="width:42%">Item</th>
-              <th style="width:18%">Resposta</th>
-              <th style="width:32%">Justificativa</th>
-            </tr>
-          </thead>
-          <tbody>${buildRows('procedimentos')}</tbody>
-        </table>
-      </div>
-
-      ${page2Photos}
-
-      <div class="print-section">
-        <h2>Assinaturas</h2>
-        <div class="print-signatures">
-          <div class="sign">
-            <img src="${draft.assinaturas.motorista}" alt="Assinatura do Motorista" />
-            <strong>Motorista</strong>
-          </div>
-          <div class="sign">
-            <img src="${draft.assinaturas.instrutor}" alt="Assinatura do Instrutor" />
-            <strong>Instrutor</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="print-footer">Prando - Operação Florestal Suzano</div>
-    </div>
-  `;
-
-  els.printArea.innerHTML = page1 + page2;
-}
-
-function printField(key, value, full = false) {
-  return `
-    <div class="print-field ${full ? 'full' : ''}">
-      <span class="k">${escapeHtml(key)}</span>
-      <span class="v">${escapeHtml(value || '-')}</span>
-    </div>
-  `;
+function setupButtons() {
+  document.getElementById('btnSalvar').addEventListener('click', async () => {
+    updateSummary();
+    await persistDraft();
+    alert('Formulário salvo com sucesso no dispositivo.');
+  });
+  document.getElementById('btnNovo').addEventListener('click', newForm);
+  document.getElementById('btnPdf').addEventListener('click', () => window.print());
 }
 
 async function init() {
-  criarQuestoes();
-  setupSignaturePad('assinaturaMotorista');
-  setupSignaturePad('assinaturaInstrutor');
-  bindEvents();
-  await restoreOnLoad();
-  await renderHistorico();
-  calcular();
-  booting = false;
+  buildQuestions();
+  setupAutosave();
+  setupSignatures();
+  setupButtons();
+  await loadDraft();
+  updateSummary();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+  }
 }
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
-}
-
-init().catch(err => {
-  console.error(err);
-  els.statusPersistencia.textContent = 'Falha na inicialização';
-  els.statusUltimoSave.textContent = 'Reabra o app.';
-});
+document.addEventListener('DOMContentLoaded', init);
