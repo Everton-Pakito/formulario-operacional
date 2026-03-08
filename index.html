@@ -3,146 +3,176 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prando - Avaliação Prática de Direção</title>
   <meta name="theme-color" content="#111111" />
-  <title>Teste Prático de Direção - Prando</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="logo-wrap">
-        <img src="logo-prando.png" alt="Prando Transportes" class="logo" />
+      <div class="brand-wrap">
+        <img src="Logo-prando-dourada.png" alt="Prando Transportes" class="brand-logo" />
+        <div>
+          <h1>Avaliação Prática de Direção</h1>
+          <p>Logística Florestal</p>
+        </div>
       </div>
-      <div class="header-copy">
-        <p class="eyebrow">Formulário Operacional</p>
-        <h1>Teste Prático de Direção</h1>
-        <p class="subtitle">• Operação Florestal Suzano</p>
+
+      <div class="top-actions">
+        <button type="button" class="ghost" id="btnSalvar">Salvar</button>
+        <button type="button" class="ghost danger" id="btnNovoFormulario">Novo formulário</button>
+        <button type="button" class="primary" id="btnPdf">Gerar PDF</button>
       </div>
     </header>
 
-    <main class="container">
-      <section class="card intro-card">
+    <main class="content">
+      <section class="panel hero-panel">
         <div>
-          <h2>Novo formulário</h2>
-          <p>Preencha os dados da avaliação, responda os itens por seção, registre evidências e acompanhe o aproveitamento em tempo real.</p>
+          <h2>Formulário Operacional</h2>
+          <p>Salvamento automático permanente, rascunho recuperado ao reabrir e relatório otimizado para PDF A4.</p>
+          <div class="status-line">
+            <span id="statusPersistencia" class="pill">Carregando...</span>
+            <span id="statusUltimoSave" class="muted">Sem salvamento recente</span>
+          </div>
         </div>
-        <div class="toolbar">
-          <button id="saveDraftBtn" class="btn secondary">Salvar rascunho</button>
-          <button id="newFormBtn" class="btn ghost">Novo formulário</button>
-          <button id="printBtn" class="btn primary">Gerar PDF / Imprimir</button>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>Pontos possíveis</span>
+            <strong id="pontosPossiveis">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Pontos realizados</span>
+            <strong id="pontosRealizados">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Não conformidades</span>
+            <strong id="naoConformidades">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Não aplicáveis</span>
+            <strong id="naoAplicaveis">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Aproveitamento</span>
+            <strong id="aproveitamento">0%</strong>
+          </div>
+          <div class="stat-card status-card wide">
+            <span>Status automático</span>
+            <strong id="statusFinal">Em avaliação</strong>
+          </div>
         </div>
       </section>
 
-      <section class="grid two-columns">
-        <article class="card">
-          <h2>Dados gerais</h2>
-          <div class="form-grid" id="generalFields"></div>
-        </article>
-
-        <article class="card summary-card sticky-card">
-          <h2>Resumo da avaliação</h2>
-          <div class="summary-grid">
-            <div class="metric"><span>Pontos possíveis</span><strong id="ppValue">0</strong></div>
-            <div class="metric"><span>Pontos realizados</span><strong id="prValue">0</strong></div>
-            <div class="metric"><span>Não conformidades</span><strong id="ncValue">0</strong></div>
-            <div class="metric"><span>Não aplicáveis</span><strong id="naValue">0</strong></div>
+      <form id="avaliacaoForm">
+        <section class="panel">
+          <div class="section-head">
+            <h3>Dados Gerais</h3>
           </div>
-          <div class="progress-wrap">
-            <div class="progress-label-row">
-              <span>Aproveitamento geral</span>
-              <strong id="aproveitamentoValue">0%</strong>
+
+          <div class="grid cols-4">
+            <label>
+              <span>Unidade</span>
+              <input type="text" name="unidade" placeholder="Ex.: UNF SP" />
+            </label>
+            <label>
+              <span>Data</span>
+              <input type="date" name="data" />
+            </label>
+            <label>
+              <span>KM Início</span>
+              <input type="number" name="kmInicio" min="0" step="0.1" placeholder="0,0" />
+            </label>
+            <label>
+              <span>KM Final</span>
+              <input type="number" name="kmFinal" min="0" step="0.1" placeholder="0,0" />
+            </label>
+
+            <label>
+              <span>Motorista</span>
+              <input type="text" name="motorista" />
+            </label>
+            <label>
+              <span>Instrutor</span>
+              <input type="text" name="instrutor" />
+            </label>
+            <label>
+              <span>Placa</span>
+              <input type="text" name="placa" />
+            </label>
+            <label>
+              <span>Nº da Viagem</span>
+              <input type="text" name="viagem" />
+            </label>
+
+            <label class="span-2">
+              <span>Empresa</span>
+              <input type="text" name="empresa" />
+            </label>
+            <label class="span-2">
+              <span>Observações Gerais</span>
+              <textarea name="observacoesGerais" rows="3" placeholder="Anote orientações, ocorrências ou informações adicionais"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h3>Direção Preventiva</h3>
+          </div>
+          <div class="question-list" id="direcaoList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h3>Procedimentos e Normas Gerais de Ação</h3>
+          </div>
+          <div class="question-list" id="procedimentosList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h3>Assinaturas</h3>
+          </div>
+
+          <div class="sign-grid">
+            <div>
+              <p class="sign-title">Assinatura do Motorista</p>
+              <canvas id="assinaturaMotorista" class="signature-pad" width="720" height="220"></canvas>
+              <div class="pad-actions">
+                <button type="button" class="ghost" data-clear="assinaturaMotorista">Limpar</button>
+              </div>
             </div>
-            <div class="progress-bar"><div id="progressBarFill"></div></div>
-          </div>
-          <div class="status-box" id="statusBox">Status: Em andamento</div>
-          <div class="summary-note">
-            O status final é calculado automaticamente. Itens marcados como <strong>Não aplicável</strong> não entram na base da nota.
-          </div>
-        </article>
-      </section>
 
-      <section class="card">
-        <h2>1. Identificação</h2>
-        <div class="form-grid" id="identificationFields"></div>
-      </section>
+            <div>
+              <p class="sign-title">Assinatura do Instrutor</p>
+              <canvas id="assinaturaInstrutor" class="signature-pad" width="720" height="220"></canvas>
+              <div class="pad-actions">
+                <button type="button" class="ghost" data-clear="assinaturaInstrutor">Limpar</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h2>2. Direção Preventiva</h2>
-            <p>Itens derivados do formulário analisado.</p>
+        <section class="panel">
+          <div class="section-head">
+            <h3>Histórico local</h3>
           </div>
-          <div class="mini-stats" id="preventivaStats"></div>
-        </div>
-        <div id="preventivaQuestions" class="question-list"></div>
-      </section>
-
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h2>3. Procedimentos e Normas Gerais de Ação</h2>
-            <p>Checklist operacional com cálculo por conformidade.</p>
+          <div class="history-wrap">
+            <p class="muted">Ao clicar em <strong>Salvar</strong>, uma cópia da avaliação é guardada localmente no dispositivo.</p>
+            <div id="historicoList" class="history-list"></div>
           </div>
-          <div class="mini-stats" id="procedimentosStats"></div>
-        </div>
-        <div id="procedimentosQuestions" class="question-list"></div>
-      </section>
-
-      <section class="grid two-columns signatures-grid">
-        <article class="card">
-          <h2>4. Assinatura do motorista</h2>
-          <div class="signature-box">
-            <canvas id="signatureDriver" width="600" height="220"></canvas>
-          </div>
-          <div class="toolbar compact">
-            <button data-clear-signature="signatureDriver" class="btn ghost">Limpar assinatura</button>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2>5. Assinatura do instrutor</h2>
-          <div class="signature-box">
-            <canvas id="signatureInstructor" width="600" height="220"></canvas>
-          </div>
-          <div class="toolbar compact">
-            <button data-clear-signature="signatureInstructor" class="btn ghost">Limpar assinatura</button>
-          </div>
-        </article>
-      </section>
-
-      <section class="card report-card">
-        <h2>Fechamento</h2>
-        <div class="form-grid" id="closureFields"></div>
-      </section>
+        </section>
+      </form>
     </main>
+
+    <footer class="footer">
+      <p>Prando - Operação Florestal Suzano</p>
+    </footer>
   </div>
 
-  <template id="questionTemplate">
-    <article class="question-card">
-      <div class="question-header">
-        <div>
-          <span class="question-number"></span>
-          <h3 class="question-title"></h3>
-        </div>
-        <span class="score-chip">Vale 1 ponto</span>
-      </div>
-      <div class="answer-row">
-        <label><input type="radio" value="Conforme" /> Conforme</label>
-        <label><input type="radio" value="Não conforme" /> Não conforme</label>
-        <label><input type="radio" value="Não aplicável" /> Não aplicável</label>
-      </div>
-      <div class="field-stack">
-        <label>Justificativa / observação
-          <textarea rows="3" class="question-note" placeholder="Descreva a observação, orientação aplicada ou detalhe relevante."></textarea>
-        </label>
-        <label>Evidências fotográficas
-          <input type="file" class="question-files" accept="image/*" multiple capture="environment" />
-        </label>
-        <div class="file-list"></div>
-      </div>
-    </article>
-  </template>
+  <section id="printArea" class="print-area"></section>
 
   <script src="app.js"></script>
 </body>
