@@ -10,62 +10,80 @@
 </head>
 <body>
   <div class="app-shell printable-area" id="printArea">
-    <header class="topbar">
+    <header class="hero-header">
+      <div class="hero-glow"></div>
       <div class="brand-wrap">
         <img src="logo-prando.png" alt="Logo Prando" class="logo" />
         <div>
+          <span class="eyebrow">Avaliação Operacional</span>
           <h1>Teste Prático de Direção</h1>
           <p>Operação Florestal Suzano</p>
         </div>
       </div>
-      <div class="top-actions no-print">
+      <div class="hero-stats">
+        <div>
+          <span>Modelo</span>
+          <strong>Prando Digital</strong>
+        </div>
+        <div>
+          <span>Preenchimento</span>
+          <strong>Online / Offline</strong>
+        </div>
+      </div>
+      <div class="top-actions no-print desktop-actions">
         <button type="button" id="btnSalvar">Salvar</button>
         <button type="button" class="secondary" id="btnNovo">Novo Formulário</button>
         <button type="button" id="btnPdf">Gerar PDF</button>
       </div>
     </header>
 
-    <section class="card">
-      <h2>Dados da Avaliação</h2>
-      <div class="grid cols-3">
+    <section class="card compact-card first-section">
+      <div class="section-head">
+        <h2>Dados da Avaliação</h2>
+        <span>Preenchimento inicial</span>
+      </div>
+      <div class="grid cols-4 compact-grid compact-fields">
         <label>Data
-          <input type="date" id="data" />
+          <input type="date" id="data" autocomplete="off" />
         </label>
         <label>Unidade
-          <input type="text" id="unidade" placeholder="Ex.: UNF SP" />
+          <input type="text" id="unidade" autocomplete="off" placeholder="Ex.: UNF SP" />
         </label>
         <label>Código
-          <input type="text" id="codigo" placeholder="Código da avaliação" />
+          <input type="text" id="codigo" autocomplete="off" placeholder="Código da avaliação" />
         </label>
         <label>Empresa
-          <input type="text" id="empresa" placeholder="Empresa" />
+          <input type="text" id="empresa" autocomplete="off" placeholder="Empresa" />
         </label>
         <label>Motorista
-          <input type="text" id="motorista" placeholder="Nome do motorista" />
+          <input type="text" id="motorista" autocomplete="off" placeholder="Nome do motorista" />
         </label>
         <label>Instrutor
-          <input type="text" id="instrutor" placeholder="Nome do instrutor" />
+          <input type="text" id="instrutor" autocomplete="off" placeholder="Nome do instrutor" />
         </label>
         <label>Placa
-          <input type="text" id="placa" placeholder="Placa" />
+          <input type="text" id="placa" autocomplete="off" placeholder="Placa" />
         </label>
         <label>Viagem
-          <input type="text" id="viagem" placeholder="Número da viagem" />
+          <input type="text" id="viagem" autocomplete="off" placeholder="Número da viagem" />
         </label>
         <label>KM Início
-          <input type="number" id="kmInicio" placeholder="0" />
+          <input type="number" id="kmInicio" autocomplete="off" placeholder="0" />
         </label>
         <label>KM Final
-          <input type="number" id="kmFinal" placeholder="0" />
+          <input type="number" id="kmFinal" autocomplete="off" placeholder="0" />
         </label>
       </div>
-      <label>Observações Gerais
-        <textarea id="observacoesGerais" rows="3" placeholder="Anotações gerais da avaliação"></textarea>
+      <label class="full-width">Observações Gerais
+        <textarea id="observacoesGerais" autocomplete="off" rows="2" placeholder="Anotações gerais da avaliação"></textarea>
       </label>
     </section>
 
     <section class="card summary-card">
-      <h2>Resumo Automático</h2>
+      <div class="section-head">
+        <h2>Resumo Automático</h2>
+        <span>Atualização em tempo real</span>
+      </div>
       <div class="summary-grid">
         <div><span>Pontos possíveis</span><strong id="pontosPossiveis">0</strong></div>
         <div><span>Pontos realizados</span><strong id="pontosRealizados">0</strong></div>
@@ -76,13 +94,25 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Questionário de Avaliação</h2>
-      <div id="questionsContainer"></div>
+    <section class="card questions-wrap">
+      <div class="section-head section-head-stack">
+        <div>
+          <h2>Questionário de Avaliação</h2>
+          <span>30 itens de verificação</span>
+        </div>
+        <div class="mini-actions no-print">
+          <button type="button" class="ghost" id="btnExpandir">Expandir todos</button>
+          <button type="button" class="ghost" id="btnRecolher">Recolher todos</button>
+        </div>
+      </div>
+      <div id="questionsContainer" class="questions-list"></div>
     </section>
 
     <section class="card signatures">
-      <h2>Assinaturas</h2>
+      <div class="section-head">
+        <h2>Assinaturas</h2>
+        <span>Validação da avaliação</span>
+      </div>
       <div class="grid cols-2">
         <div>
           <h3>Assinatura do Motorista</h3>
@@ -104,6 +134,14 @@
     <footer class="footer">
       Prando - Operação Florestal Suzano
     </footer>
+  </div>
+
+  <div class="floating-bar no-print" aria-label="Ações rápidas">
+    <div class="floating-actions">
+      <button type="button" data-action="salvar">Salvar</button>
+      <button type="button" class="secondary" data-action="novo">Novo Formulário</button>
+      <button type="button" data-action="pdf">Gerar PDF</button>
+    </div>
   </div>
 
   <script src="app.js"></script>

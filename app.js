@@ -61,7 +61,9 @@ async function idbSet(value) {
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });
-  } catch (e) { console.warn('IndexedDB indisponível', e); }
+  } catch (e) {
+    console.warn('IndexedDB indisponível', e);
+  }
 }
 
 async function idbGet() {
@@ -73,7 +75,10 @@ async function idbGet() {
       req.onsuccess = () => resolve(req.result ? req.result.payload : null);
       req.onerror = () => reject(req.error);
     });
-  } catch (e) { console.warn('IndexedDB indisponível', e); return null; }
+  } catch (e) {
+    console.warn('IndexedDB indisponível', e);
+    return null;
+  }
 }
 
 async function idbDelete() {
@@ -85,7 +90,9 @@ async function idbDelete() {
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });
-  } catch (e) { console.warn('IndexedDB indisponível', e); }
+  } catch (e) {
+    console.warn('IndexedDB indisponível', e);
+  }
 }
 
 function buildQuestions() {
@@ -93,26 +100,63 @@ function buildQuestions() {
   container.innerHTML = '';
   questions.forEach((text, index) => {
     const id = index + 1;
-    const card = document.createElement('div');
+    const card = document.createElement('details');
     card.className = 'question-card';
     card.dataset.questionId = id;
+    if (id <= 2) card.open = true;
     card.innerHTML = `
-      <h3>${id}. ${text}</h3>
-      <div class="options">
-        <label><input type="radio" name="q_${id}" value="conforme"> Conforme</label>
-        <label><input type="radio" name="q_${id}" value="nao_conforme"> Não Conforme</label>
-        <label><input type="radio" name="q_${id}" value="nao_aplicavel"> Não Aplicável</label>
-      </div>
-      <div class="question-meta">
-        <label>Justificativa
-          <textarea rows="3" id="justificativa_${id}" placeholder="Descreva a observação, orientação ou não conformidade"></textarea>
-        </label>
-        <label>Fotos
-          <input type="file" id="foto_${id}" accept="image/*" multiple />
-          <div class="image-preview" id="preview_${id}"></div>
-        </label>
+      <summary class="question-summary">
+        <span class="question-number">${id}</span>
+        <span class="question-title">${text}</span>
+        <span class="question-status" id="status_q_${id}">Pendente</span>
+        <span class="chevron">▾</span>
+      </summary>
+      <div class="question-body">
+        <div class="options">
+          <label><input type="radio" name="q_${id}" value="conforme"> Conforme</label>
+          <label><input type="radio" name="q_${id}" value="nao_conforme"> Não Conforme</label>
+          <label><input type="radio" name="q_${id}" value="nao_aplicavel"> Não Aplicável</label>
+        </div>
+        <div class="question-meta">
+          <label>Justificativa
+            <textarea rows="3" id="justificativa_${id}" placeholder="Descreva a observação, orientação ou não conformidade"></textarea>
+          </label>
+          <label>Fotos
+            <input type="file" id="foto_${id}" accept="image/*" multiple />
+            <div class="image-preview" id="preview_${id}"></div>
+          </label>
+        </div>
       </div>`;
     container.appendChild(card);
+  });
+}
+
+function updateQuestionVisual(id) {
+  const value = document.querySelector(`input[name="q_${id}"]:checked`)?.value || '';
+  const statusEl = document.getElementById(`status_q_${id}`);
+  if (!statusEl) return;
+  statusEl.className = 'question-status';
+  if (!value) {
+    statusEl.textContent = 'Pendente';
+    return;
+  }
+  if (value === 'conforme') {
+    statusEl.textContent = 'Conforme';
+    statusEl.classList.add('is-ok');
+    return;
+  }
+  if (value === 'nao_conforme') {
+    statusEl.textContent = 'Não Conforme';
+    statusEl.classList.add('is-nc');
+    return;
+  }
+  statusEl.textContent = 'Não Aplicável';
+  statusEl.classList.add('is-na');
+}
+
+function setAllQuestionCards(open) {
+  document.querySelectorAll('.question-card').forEach(card => {
+    card.open = open;
   });
 }
 
@@ -171,6 +215,7 @@ function applyFormData(data) {
         preview.innerHTML = '';
         (item.fotos || []).forEach(src => addPreviewImage(preview, src));
       }
+      updateQuestionVisual(item.id);
     });
   }
   if (data.assinaturaMotorista) drawImageOnCanvas('assinaturaMotorista', data.assinaturaMotorista);
@@ -208,7 +253,9 @@ async function handleFiles(input) {
 function updateSummary() {
   let possiveis = 0, realizados = 0, nc = 0, na = 0;
   questions.forEach((_, idx) => {
-    const value = document.querySelector(`input[name="q_${idx + 1}"]:checked`)?.value || '';
+    const qid = idx + 1;
+    const value = document.querySelector(`input[name="q_${qid}"]:checked`)?.value || '';
+    updateQuestionVisual(qid);
     if (!value) return;
     if (value === 'nao_aplicavel') {
       na++;
@@ -218,6 +265,7 @@ function updateSummary() {
     if (value === 'conforme') realizados++;
     if (value === 'nao_conforme') nc++;
   });
+
   const aproveitamento = possiveis ? Math.round((realizados / possiveis) * 100) : 0;
   const status = possiveis === 0 ? 'Pendente' : (aproveitamento >= 80 ? 'Aprovado' : 'Reprovado');
   document.getElementById('pontosPossiveis').textContent = possiveis;
@@ -255,13 +303,48 @@ async function loadDraft() {
   applyFormData(fromIdb || fromLs);
 }
 
+function clearSignatureCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function clearFormUi() {
+  getFieldIds().forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  questions.forEach((_, idx) => {
+    const id = idx + 1;
+    document.querySelectorAll(`input[name="q_${id}"]`).forEach(radio => { radio.checked = false; });
+    const textarea = document.getElementById(`justificativa_${id}`);
+    if (textarea) textarea.value = '';
+    const preview = document.getElementById(`preview_${id}`);
+    if (preview) preview.innerHTML = '';
+    const fileInput = document.getElementById(`foto_${id}`);
+    if (fileInput) fileInput.value = '';
+    updateQuestionVisual(id);
+  });
+
+  clearSignatureCanvas('assinaturaMotorista');
+  clearSignatureCanvas('assinaturaInstrutor');
+  setAllQuestionCards(false);
+  const firstCard = document.querySelector('.question-card');
+  if (firstCard) firstCard.open = true;
+  updateSummary();
+}
+
 async function newForm() {
   if (!confirm('Deseja iniciar um novo formulário? O rascunho atual será arquivado e o formulário será limpo.')) return;
   const current = collectFormData();
-  archiveCurrentForm(current);
+  const hasContent = JSON.stringify(current.metadata).match(/[\wÀ-ÿ]/) || current.respostas.some(r => r.resposta || r.justificativa || (r.fotos && r.fotos.length)) || current.assinaturaMotorista || current.assinaturaInstrutor;
+  if (hasContent) archiveCurrentForm(current);
   localStorage.removeItem(STORAGE_KEY);
   await idbDelete();
-  location.reload();
+  clearFormUi();
+  await persistDraft();
+  alert('Novo formulário iniciado. O formulário anterior foi limpo deste aparelho.');
 }
 
 function setupAutosave() {
@@ -272,6 +355,7 @@ function setupAutosave() {
       persistDraft();
     });
   });
+
   questions.forEach((_, idx) => {
     document.getElementById(`foto_${idx + 1}`).addEventListener('change', e => handleFiles(e.target));
   });
@@ -349,14 +433,31 @@ function isCanvasBlank(canvas) {
   return !pixels.some(channel => channel !== 0);
 }
 
+async function saveCurrentForm() {
+  updateSummary();
+  await persistDraft();
+  alert('Formulário salvo com sucesso no dispositivo.');
+}
+
+function printPdf() {
+  setAllQuestionCards(true);
+  window.print();
+}
+
+function bindAction(button, action) {
+  if (!button) return;
+  if (action === 'salvar') button.addEventListener('click', saveCurrentForm);
+  if (action === 'novo') button.addEventListener('click', newForm);
+  if (action === 'pdf') button.addEventListener('click', printPdf);
+}
+
 function setupButtons() {
-  document.getElementById('btnSalvar').addEventListener('click', async () => {
-    updateSummary();
-    await persistDraft();
-    alert('Formulário salvo com sucesso no dispositivo.');
-  });
-  document.getElementById('btnNovo').addEventListener('click', newForm);
-  document.getElementById('btnPdf').addEventListener('click', () => window.print());
+  bindAction(document.getElementById('btnSalvar'), 'salvar');
+  bindAction(document.getElementById('btnNovo'), 'novo');
+  bindAction(document.getElementById('btnPdf'), 'pdf');
+  document.querySelectorAll('[data-action]').forEach(btn => bindAction(btn, btn.dataset.action));
+  document.getElementById('btnExpandir')?.addEventListener('click', () => setAllQuestionCards(true));
+  document.getElementById('btnRecolher')?.addEventListener('click', () => setAllQuestionCards(false));
 }
 
 async function init() {
